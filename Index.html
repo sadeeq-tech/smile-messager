@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="ha">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smile©️ Messenger</title>
+    <style>
+        :root { --primary: #ffcc00; --bg: #f4f4f9; --dark: #222; }
+        body { font-family: sans-serif; background: var(--bg); display: flex; justify-content: center; align-items: center; min-height: 100vh; margin:0;}
+        .phone { width: 100%; max-width: 380px; height: 600px; background: white; border-radius: 20px; box-shadow: 0 10px 20px rgba(0,0,0,0.2); display: flex; flex-direction: column; overflow: hidden; border: 6px solid var(--dark); }
+        .header { background: var(--primary); padding: 15px; text-align: center; font-weight: bold; font-size: 1.2rem; }
+        .screen { padding: 15px; flex: 1; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; }
+        .hidden { display: none !important; }
+        input, button { padding: 10px; border-radius: 5px; border: 1px solid #ccc; font-size: 1rem; box-sizing: border-box; }
+        button { background: var(--dark); color: white; border: none; cursor: pointer; font-weight: bold; }
+        .chat-box { flex: 1; background: #fffdf0; border: 1px solid #ddd; border-radius: 5px; padding: 10px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
+        .msg { padding: 8px 12px; border-radius: 8px; max-width: 75%; font-size: 0.9rem; }
+        .sent { background: #ffe893; align-self: flex-end; }
+        .received { background: #e2e2e2; align-self: flex-start; }
+        .status-area { background: #fff3cd; padding: 8px; border-radius: 5px; font-size: 0.85rem; border-left: 4px solid var(--primary); }
+    </style>
+</head>
+<body>
+
+<div class="phone">
+    <div class="header">Smile©️ Messenger</div>
+
+    <!-- Login -->
+    <div id="login-screen" class="screen">
+        <h3 style="text-align:center;">Shigar da Lambar Waya</h3>
+        <input type="text" id="phone-input" placeholder="Misali: 08011112222">
+        <button onclick="login()">Shiga</button>
+    </div>
+
+    <!-- Main Chat -->
+    <div id="main-screen" class="screen hidden">
+        <div id="status-display" class="status-area">Status: Loading...</div>
+        <div style="display:flex; gap:5px;">
+            <input type="text" id="status-input" placeholder="Sabon Status..." style="flex:1;">
+            <button onclick="changeStatus()">Canza</button>
+        </div>
+        
+        <hr style="width:100%; border:0; border-top:1px solid #eee;">
+        
+        <input type="text" id="receiver-input" placeholder="Lambar wanda zaka tura mawa">
+        <div class="chat-box" id="chat-box"></div>
+        
+        <div style="display:flex; gap:5px;">
+            <input type="text" id="message-input" placeholder="Rubuta saƙo..." style="flex:1;">
+            <button onclick="send()">Tura</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const SERVER = "http://127.0.0.1:8000";
+    let myNumber = "";
+
+    async function login() {
+        const num = document.getElementById('phone-input').value.trim();
+        if(!num) return alert("Saka lamba!");
+        
+        const res = await fetch(`${SERVER}/register`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ phone_number: num })
+        });
+        const data = await res.json();
+        myNumber = num;
+        
+        document.getElementById('login-screen').classList.add('hidden');
+        document.getElementById('main-screen').classList.remove('hidden');
+        document.getElementById('status-display').innerText = `Status: ${data.user.status}`;
+        
+        setInterval(loadMessages, 2000); // Duba saƙonni duk bayan sakan 2
+    }
+
+    async function changeStatus() {
+        const txt = document.getElementById('status-input').value.trim();
+        if(!txt) return;
+        const res = await fetch(`${SERVER}/status`, {
+            method: 'PUT',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ phone_number: myNumber, new_status: txt })
+        });
+        const data = await res.json();
+        document.getElementById('status-display').innerText = `Status: ${data.current_status}`;
+        document.getElementById('status-input').value = "";
+    }
+
+    async function send() {
+        const to = document.getElementById('receiver-input').value.trim();
+        const txt = document.getElementById('message-input').value.trim();
+        if(!to || !txt) return alert("Saka lambar wanda zai karba da saƙon!");
+        
+        const res = await fetch(`${SERVER}/send`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ sender: myNumber, receiver: to, text_message: txt })
+        });
+        if(res.ok) {
+            document.getElementById('message-input').value = "";
+            loadMessages();
+        } else {
+            alert("Lamba ba ta kan Smile©️!");
+        }
+    }
+
+    async function loadMessages() {
+        if(!myNumber) return;
+        const res = await fetch(`${SERVER}/messages/${myNumber}`);
+        const data = await res.json();
+        const box = document.getElementById('chat-box');
+        const activeReceiver = document.getElementById('receiver-input').value.trim();
+        
+        box.innerHTML = "";
+        data.inbox.forEach(m => {
+            // Tace saƙonni tsakanin kai da wanda ka saka lambarsa kawai
+            if((m.sender === myNumber && m.receiver === activeReceiver) || (m.sender === activeReceiver && m.receiver === myNumber)) {
+                const div = document.createElement('div');
+                div.classList.add('msg', m.sender === myNumber ? 'sent' : 'received');
+                div.innerText = m.text;
+                box.appendChild(div);
+            }
+        });
+        box.scrollTop = box.scrollHeight;
+    }
+</script>
+</body>
+</html>
